@@ -33,8 +33,8 @@ def _get_json(url: str, timeout: int = 30):
     r.raise_for_status()
     ctype = (r.headers.get("content-type") or "").lower()
     if "json" not in ctype:
-        preview = r.text[:160].replace("
-", " ")
+        preview = r.text[:160].replace("\n", " ")
+        
         raise RuntimeError(f"Expected JSON but got {ctype or 'unknown content type'} from {url}. Preview: {preview}")
     return r.json()
 

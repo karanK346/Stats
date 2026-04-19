@@ -87,66 +87,50 @@ def search_nba_players(query: str) -> list[dict]:
     return results
 
 
-def fetch_nba_player_logs(player_id: str, player_name: str, seasons: list[str]) -> pd.DataFrame:
-    rows: list[dict] = []
-    for season in seasons:
-        try:
-            end_year = int(str(season)[:4]) + 1 if "-" in str(season) else int(str(season)[:4])
-        except Exception:
-            continue
-        url = f"https://www.basketball-reference.com/players/{player_id[0]}/{player_id}/gamelog/{end_year}"
-        try:
-            r = requests.get(url, headers=UA, timeout=20)
-            if r.status_code >= 400:
-                continue
-            soup = BeautifulSoup(r.text, "lxml")
-            table = soup.find("table", {"id": "pgl_basic"})
-            if table is None:
-                continue
-            body = table.find("tbody")
-            if body is None:
-                continue
-            for tr in body.find_all("tr"):
-                if "thead" in (tr.get("class") or []):
-                    continue
-                reason_td = tr.find("td", {"data-stat": "reason"})
-                if reason_td and reason_td.get_text(strip=True):
-                    continue
-                date_td = tr.find("td", {"data-stat": "date_game"})
-                if date_td is None:
-                    continue
-                date = date_td.get_text(strip=True)
-                homeaway = tr.find("td", {"data-stat": "game_location"})
-                opp = tr.find("td", {"data-stat": "opp_id"})
-                team = tr.find("td", {"data-stat": "team_id"})
-                def get_stat(key: str):
-                    td = tr.find("td", {"data-stat": key})
-                    return safe_float(td.get_text(strip=True) if td else None)
-                pts = get_stat("pts")
-                reb = get_stat("trb")
-                ast = get_stat("ast")
-                threes = get_stat("fg3")
-                rows.append({
-                    "sport": "nba",
-                    "player_id": str(player_id),
-                    "player_name": player_name,
-                    "season": str(season),
-                    "game_date": date,
-                    "opponent": opp.get_text(strip=True) if opp else None,
-                    "team": team.get_text(strip=True) if team else None,
-                    "home_away": "AWAY" if homeaway and homeaway.get_text(strip=True) == "@" else "HOME",
-                    "stat_points": pts,
-                    "stat_rebounds": reb,
-                    "stat_assists": ast,
-                    "stat_threes": threes,
-                    "stat_pra": (pts or 0) + (reb or 0) + (ast or 0),
-                    "raw_json": json.dumps({"source": "basketball_reference", "season": season, "date": date}),
-                })
-            time.sleep(0.2)
-        except Exception:
-            continue
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
+def fetch_nba_logs(player_id: str, seasons: list):
+    all_games = []
 
+    for season in seasons:
+        # convert 2025-26 → 2026
+        year = int(season.split("-")[1])
+
+        url = f"https://www.basketball-reference.com/players/{player_id[0]}/{player_id}/gamelog/{year}"
+
+        r = requests.get(url)
+        if r.status_code != 200:
+            continue
+
+        soup = BeautifulSoup(r.text, "lxml")
+
+        # IMPORTANT: correct table id
+        table = soup.find("table", {"id": "pgl_basic"})
+
+        if table is None:
+            continue
+
+        df = pd.read_html(str(table))[0]
+
+        # remove header rows that repeat
+        df = df[df["Rk"] != "Rk"]
+
+        # convert stats
+        if "PTS" in df.columns:
+            df["PTS"] = pd.to_numeric(df["PTS"], errors="coerce")
+
+        if "AST" in df.columns:
+            df["AST"] = pd.to_numeric(df["AST"], errors="coerce")
+
+        if "TRB" in df.columns:
+            df["TRB"] = pd.to_numeric(df["TRB"], errors="coerce")
+
+        df = df.dropna()
+
+        all_games.append(df)
+
+    if not all_games:
+        return pd.DataFrame()
+
+    return pd.concat(all_games)
 
 # ---------------- NHL ---------------- #
 

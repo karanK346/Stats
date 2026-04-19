@@ -6,7 +6,7 @@ from typing import Any, Iterable
 from bs4 import BeautifulSoup
 import pandas as pd
 import requests
-import statsapi
+
 
 NHL_TIMEOUT = 30
 UA = {
@@ -229,14 +229,6 @@ def _mlb_years_from_labels(seasons: list[str]) -> list[int]:
     return years
 
 
-def _fetch_mlb_group(player_id: str, player_name: str, year: int, group: str) -> pd.DataFrame:
-    payload = statsapi.get(
-        "person",
-        {
-            "personId": str(player_id),
-            "hydrate": f"stats(group=[{group}],type=[gameLog],season={year},sportId=1),currentTeam",
-        },
-    )
     people = payload.get("people", []) if isinstance(payload, dict) else []
     if not people:
         return pd.DataFrame()

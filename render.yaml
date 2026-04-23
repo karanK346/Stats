@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: player-line-predictor
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Line Predictor — NBA · NHL · MLB</title>
+  <link rel="stylesheet" href="/static/styles.css"/>
+</head>
+<body>
+<main class="container">
+
+  <!-- ── HERO ─────────────────────────────────────────────────── -->
+  <section class="card hero">
+    <div class="hero-left">
+      <div class="hero-badge">AI PROP PREDICTOR &nbsp;·&nbsp; V3.0</div>
+      <h1>PLAYER <span>LINE</span><br>PREDICTOR</h1>
+      <p class="hero-sub">
+        Machine-learning over/under projections using real game logs.
+        NBA · NHL · MLB — no API key needed.
+      </p>
+    </div>
+    <div class="sport-pills">
+      <div class="sport-pill active" id="pill-nba">
+        <span class="dot"></span>NBA
+      </div>
+      <div class="sport-pill" id="pill-nhl">
+        <span class="dot"></span>NHL
+      </div>
+      <div class="sport-pill" id="pill-mlb">
+        <span class="dot"></span>MLB
+      </div>
+    </div>
+  </section>
+
+  <!-- ── STEP 1 + 2 ────────────────────────────────────────────── -->
+  <section class="card two-col" style="padding:0;">
+    <!-- Search -->
+    <div>
+      <div class="section-label">Step 01</div>
+      <div class="section-title">Find Player</div>
+
+      <div class="field-group">
+        <div class="field">
+          <label for="sport">Sport</label>
+          <div class="select-wrap">
+            <select id="sport">
+              <option value="nba">NBA</option>
+              <option value="nhl">NHL</option>
+              <option value="mlb">MLB</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="playerQuery">Player Name</label>
+          <input id="playerQuery" placeholder="e.g. LeBron James" autocomplete="off"/>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" id="searchBtn">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"
+               viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Search
+        </button>
+        <button class="btn btn-secondary" id="clearBtn">Clear</button>
+      </div>
+
+      <div id="searchStatus" class="status muted"></div>
+      <div id="selectedDisplay" class="selected-player"></div>
+      <div id="searchResults" class="results-list"></div>
+    </div>
+
+    <!-- Sync -->
+    <div>
+      <div class="section-label">Step 02</div>
+      <div class="section-title">Sync Data</div>
+
+      <div class="field">
+        <label for="seasonsInput">Seasons</label>
+        <input id="seasonsInput" placeholder="e.g. 2025-26,2024-25,2023-24"/>
+      </div>
+
+      <div class="btn-group-3">
+        <button class="btn btn-secondary" id="recent5Btn">5 Seasons</button>
+        <button class="btn btn-secondary" id="recent10Btn">10 Seasons</button>
+        <button class="btn btn-primary" id="syncBtn">Sync</button>
+      </div>
+
+      <div id="syncStatus" class="status muted"></div>
+
+      <div class="divider"></div>
+      <p class="tip">
+        🔁 &nbsp;Predict will auto-sync if no cached data exists for the player.<br>
+        NBA logs are fetched from Basketball Reference.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── STEP 3 ─────────────────────────────────────────────────── -->
+  <section class="card two-col" style="padding:0;">
+    <!-- Prediction controls -->
+    <div>
+      <div class="section-label">Step 03</div>
+      <div class="section-title">Run Prediction</div>
+
+      <div class="field-group">
+        <div class="field">
+          <label for="stat">Stat</label>
+          <div class="select-wrap">
+            <select id="stat"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="line">Line</label>
+          <input id="line" type="number" step="0.5" placeholder="e.g. 27.5"/>
+        </div>
+      </div>
+
+      <button class="btn btn-predict" id="predictBtn">
+        ⚡&nbsp; PREDICT
+      </button>
+
+      <div id="predictStatus" class="status muted"></div>
+
+      <div id="summaryCards" class="summary-grid"></div>
+    </div>
+
+    <!-- Chart -->
+    <div>
+      <div class="section-label">Trend</div>
+      <div class="section-title">Last 20 Games</div>
+      <div class="chart-wrap">
+        <canvas id="trendChart" height="230"></canvas>
+      </div>
+      <p class="tip" style="margin-top:10px;">
+        Red dashed line = your line. Blue curve = stat value per game.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── RESULTS ────────────────────────────────────────────────── -->
+  <section class="card two-col" style="padding:0;">
+    <div>
+      <div class="section-label">Results</div>
+      <div class="section-title">Recent Games</div>
+      <div id="predictResult"><p class="tip">Run a prediction to see recent game log.</p></div>
+    </div>
+    <div>
+      <div class="section-label">Model Insight</div>
+      <div class="section-title">Feature Weights</div>
+      <div id="featureImportance" class="feat-list">
+        <p class="tip">Feature importance will appear after prediction.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CACHE ──────────────────────────────────────────────────── -->
+  <section class="card" style="padding:26px 30px;">
+    <div class="section-head">
+      <div>
+        <div class="section-label">Database</div>
+        <div class="section-title" style="margin-bottom:0;">Cached Players</div>
+      </div>
+      <button class="btn btn-secondary" id="refreshCacheBtn" style="width:auto;padding:9px 20px;">
+        Refresh
+      </button>
+    </div>
+    <div id="cachedPlayers"><p class="tip" style="margin-top:12px;">Loading…</p></div>
+  </section>
+
+</main>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   State & helpers
+═══════════════════════════════════════════════════════════════════ */
+const STATS = {
+  nba: ["points","rebounds","assists","threes","pra"],
+  nhl: ["goals","assists","points","shots"],
+  mlb: ["hits","home_runs","rbi","strikeouts"],
+};
+
+let selectedPlayer = null;
+
+function setStatus(id, msg, cls = "muted") {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = `status ${cls}`;
+}
+
+async function postJSON(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(text || "Non-JSON response"); }
+  if (!res.ok) throw new Error(data.detail || data.error || "Request failed");
+  return data;
+}
+
+/* ── Sport switch ──────────────────────────────────────────────── */
+function updateSportPills(sport) {
+  ["nba","nhl","mlb"].forEach(s => {
+    document.getElementById(`pill-${s}`).classList.toggle("active", s === sport);
+  });
+}
+
+function fillStatOptions(sport) {
+  const sel = document.getElementById("stat");
+  sel.innerHTML = "";
+  STATS[sport].forEach(s => {
+    const o = document.createElement("option");
+    o.value = s;
+    o.textContent = s.replaceAll("_", " ");
+    sel.appendChild(o);
+  });
+}
+
+async function fillDefaultSeasons(count) {
+  const sport = document.getElementById("sport").value;
+  const res = await fetch(`/api/default-seasons/${sport}?count=${count}`);
+  const data = await res.json();
+  document.getElementById("seasonsInput").value = data.seasons.join(",");
+}
+
+document.getElementById("sport").addEventListener("change", function() {
+  const sport = this.value;
+  updateSportPills(sport);
+  fillStatOptions(sport);
+  clearSelection();
+  fillDefaultSeasons(5);
+});
+
+/* ── Player selection ──────────────────────────────────────────── */
+function clearSelection() {
+  selectedPlayer = null;
+  const disp = document.getElementById("selectedDisplay");
+  disp.textContent = "";
+  disp.classList.remove("visible");
+  document.getElementById("searchResults").innerHTML = "";
+  setStatus("searchStatus", "");
+}
+
+function selectPlayer(p) {
+  selectedPlayer = p;
+  const disp = document.getElementById("selectedDisplay");
+  disp.textContent = p.name;
+  disp.classList.add("visible");
+  document.getElementById("searchResults").innerHTML = "";
+  setStatus("searchStatus", "Player selected — sync or predict", "ok");
+}
+
+/* ── Search ────────────────────────────────────────────────────── */
+document.getElementById("searchBtn").onclick = async () => {
+  const sport = document.getElementById("sport").value;
+  const query = document.getElementById("playerQuery").value.trim();
+  if (!query) return setStatus("searchStatus", "Enter a player name.", "err");
+
+  const container = document.getElementById("searchResults");
+  container.innerHTML = "";
+  setStatus("searchStatus", "Searching…", "info");
+
+  try {
+    const data = await postJSON("/api/search", { sport, query });
+    if (!data.results.length) {
+      setStatus("searchStatus", "No results found.", "err");
+      return;
+    }
+    setStatus("searchStatus", `${data.results.length} result(s) — click to select`, "muted");
+    data.results.forEach(p => {
+      const btn = document.createElement("button");
+      btn.className = "player-btn";
+      btn.textContent = p.name;
+      btn.onclick = () => selectPlayer(p);
+      container.appendChild(btn);
+    });
+  } catch(e) {
+    setStatus("searchStatus", `Error: ${e.message}`, "err");
+  }
+};
+
+document.getElementById("clearBtn").onclick = clearSelection;
+document.getElementById("playerQuery").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("searchBtn").click();
+});
+
+/* ── Sync ──────────────────────────────────────────────────────── */
+document.getElementById("syncBtn").onclick = async () => {
+  if (!selectedPlayer) return setStatus("syncStatus", "Select a player first.", "err");
+  const sport   = document.getElementById("sport").value;
+  const seasons = document.getElementById("seasonsInput").value
+    .split(",").map(s => s.trim()).filter(Boolean);
+
+  setStatus("syncStatus", "Fetching game logs…", "info");
+  try {
+    const data = await postJSON("/api/sync", {
+      sport,
+      player_id:   selectedPlayer.id,
+      player_name: selectedPlayer.name,
+      seasons,
+    });
+    setStatus("syncStatus", `✓ Synced ${data.inserted_games} games`, "ok");
+    refreshCache();
+  } catch(e) {
+    setStatus("syncStatus", `Error: ${e.message}`, "err");
+  }
+};
+
+document.getElementById("recent5Btn").onclick  = () => fillDefaultSeasons(5);
+document.getElementById("recent10Btn").onclick = () => fillDefaultSeasons(10);
+
+/* ── Predict ───────────────────────────────────────────────────── */
+document.getElementById("predictBtn").onclick = async () => {
+  if (!selectedPlayer) return setStatus("predictStatus", "Select a player first.", "err");
+  const sport   = document.getElementById("sport").value;
+  const stat    = document.getElementById("stat").value;
+  const lineVal = parseFloat(document.getElementById("line").value);
+  if (isNaN(lineVal)) return setStatus("predictStatus", "Enter a valid line number.", "err");
+
+  setStatus("predictStatus", "Running model…", "info");
+  const seasons = document.getElementById("seasonsInput").value
+    .split(",").map(s => s.trim()).filter(Boolean);
+
+  try {
+    const data = await postJSON("/api/predict", {
+      sport,
+      player_id:   selectedPlayer.id,
+      player_name: selectedPlayer.name,
+      stat,
+      line:        lineVal,
+      auto_sync:   true,
+      seasons,
+    });
+    setStatus("predictStatus", `✓ Prediction complete — ${data.games_used} games analysed`, "ok");
+    renderSummary(data, stat);
+    renderRecentGames(data.recent_games, data.line);
+    renderFeatureImportance(data.feature_importance);
+    drawChart(data.chart_points, data.line);
+  } catch(e) {
+    setStatus("predictStatus", `Error: ${e.message}`, "err");
+  }
+};
+
+/* ── Summary cards ─────────────────────────────────────────────── */
+function renderSummary(data, stat) {
+  const isOver = data.lean === "OVER";
+  const cards = [
+    { label: "Lean",                  val: data.lean,                     cls: isOver ? "over" : "under" },
+    { label: `Predicted ${stat.replaceAll("_"," ")}`, val: data.predicted_stat, cls: "" },
+    { label: "Edge",                  val: data.edge,                     cls: "" },
+    { label: "Prob Over",             val: (data.prob_over * 100).toFixed(1) + "%", cls: data.prob_over >= 0.5 ? "over" : "under" },
+    { label: "Last-10 Hit Rate",      val: data.hit_rate_last_10 != null ? (data.hit_rate_last_10 * 100).toFixed(0) + "%" : "—", cls: "" },
+    { label: "Model MAE",             val: data.mae != null ? data.mae : "—", cls: "" },
+  ];
+  document.getElementById("summaryCards").innerHTML = cards.map(c => `
+    <div class="summary-card ${c.cls}">
+      <div class="summary-label">${c.label}</div>
+      <div class="summary-value">${c.val}</div>
+    </div>`).join("");
+}
+
+/* ── Recent games table ────────────────────────────────────────── */
+function renderRecentGames(games, line) {
+  if (!games || !games.length) {
+    document.getElementById("predictResult").innerHTML = "<p class='tip'>No recent games data.</p>";
+    return;
+  }
+  document.getElementById("predictResult").innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Opponent</th><th>H/A</th><th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${games.map(g => {
+            const v = g.target ?? "–";
+            const cls = typeof v === "number" && line != null
+              ? (v > line ? "val-high" : "val-low") : "";
+            return `<tr>
+              <td>${g.game_date ?? "–"}</td>
+              <td>${g.opponent   ?? "–"}</td>
+              <td>${g.home_away  ?? "–"}</td>
+              <td class="${cls}">${v}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/* ── Feature importance ────────────────────────────────────────── */
+function renderFeatureImportance(items) {
+  if (!items || !items.length) return;
+  const max = items[0].importance;
+  document.getElementById("featureImportance").innerHTML = items.map(x => `
+    <div class="feat-row">
+      <span class="feat-name">${x.feature}</span>
+      <div class="feat-bar-wrap">
+        <div class="feat-bar" style="width:${Math.round((x.importance / max) * 100)}%"></div>
+      </div>
+      <span class="feat-val">${x.importance}</span>
+    </div>`).join("");
+}
+
+/* ── Chart ─────────────────────────────────────────────────────── */
+function drawChart(points, line) {
+  const canvas = document.getElementById("trendChart");
+  const ctx    = canvas.getContext("2d");
+  const dpr    = window.devicePixelRatio || 1;
+  const rect   = canvas.getBoundingClientRect();
+
+  canvas.width  = rect.width  * dpr;
+  canvas.height = 230 * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width, H = 230;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!points || !points.length) {
+    ctx.fillStyle = "#5a7090";
+    ctx.font = "13px JetBrains Mono, monospace";
+    ctx.fillText("Run a prediction to see trend chart.", 16, 36);
+    return;
+  }
+
+  const PAD = { top: 20, right: 20, bottom: 28, left: 36 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top  - PAD.bottom;
+
+  const vals = points.map(p => p.value);
+  const allVals = line != null ? [...vals, line] : vals;
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const range = Math.max(maxV - minV, 1);
+
+  const xOf = i => PAD.left + (i / Math.max(points.length - 1, 1)) * cW;
+  const yOf = v => PAD.top  + cH - ((v - minV) / range) * cH;
+
+  // grid lines
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (cH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, y);
+    ctx.lineTo(W - PAD.right, y);
+    ctx.stroke();
+  }
+
+  // y-axis labels
+  ctx.fillStyle = "#5a7090";
+  ctx.font = `10px JetBrains Mono, monospace`;
+  ctx.textAlign = "right";
+  for (let i = 0; i <= 4; i++) {
+    const v = minV + (range / 4) * (4 - i);
+    const y = PAD.top + (cH / 4) * i;
+    ctx.fillText(v.toFixed(1), PAD.left - 6, y + 4);
+  }
+
+  // line marker
+  if (line != null) {
+    const yL = yOf(line);
+    ctx.strokeStyle = "rgba(255,60,95,0.8)";
+    ctx.setLineDash([6, 5]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, yL);
+    ctx.lineTo(W - PAD.right, yL);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // label
+    ctx.fillStyle = "#ff3c5f";
+    ctx.textAlign = "left";
+    ctx.font = "10px JetBrains Mono, monospace";
+    ctx.fillText(line.toFixed(1), W - PAD.right + 3, yL + 4);
+  }
+
+  // area fill under curve
+  const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+  grad.addColorStop(0,   "rgba(0,212,255,0.18)");
+  grad.addColorStop(1,   "rgba(0,212,255,0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(points[0].value));
+  points.forEach((p, i) => ctx.lineTo(xOf(i), yOf(p.value)));
+  ctx.lineTo(xOf(points.length - 1), PAD.top + cH);
+  ctx.lineTo(xOf(0), PAD.top + cH);
+  ctx.closePath();
+  ctx.fill();
+
+  // curve
+  ctx.strokeStyle = "#00d4ff";
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = "round";
+  ctx.lineCap  = "round";
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    i === 0 ? ctx.moveTo(xOf(i), yOf(p.value))
+            : ctx.lineTo(xOf(i), yOf(p.value));
+  });
+  ctx.stroke();
+
+  // dots
+  points.forEach((p, i) => {
+    const x = xOf(i), y = yOf(p.value);
+    const isOver = line != null && p.value > line;
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = isOver ? "#00ff87" : "#ff3c5f";
+    ctx.fill();
+  });
+
+  // x-axis dates (first and last only)
+  ctx.fillStyle = "#5a7090";
+  ctx.font = "10px JetBrains Mono, monospace";
+  ctx.textAlign = "center";
+  if (points.length > 0) {
+    ctx.fillText(points[0].date,                         xOf(0),                 H - 6);
+    ctx.fillText(points[points.length - 1].date,         xOf(points.length - 1), H - 6);
+  }
+}
+
+/* ── Cached players ────────────────────────────────────────────── */
+async function refreshCache() {
+  const wrap = document.getElementById("cachedPlayers");
+  wrap.innerHTML = "<p class='tip'>Loading…</p>";
+  const res  = await fetch("/api/cached");
+  const data = await res.json();
+  if (!data.players.length) {
+    wrap.innerHTML = "<p class='tip'>No cached players yet. Sync a player to get started.</p>";
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="table-wrap" style="margin-top:14px;">
+      <table>
+        <thead><tr>
+          <th>Sport</th><th>Player</th><th>Games</th><th>First</th><th>Last</th>
+        </tr></thead>
+        <tbody>
+          ${data.players.map(p => `
+            <tr>
+              <td>${p.sport.toUpperCase()}</td>
+              <td>${p.player_name}</td>
+              <td>${p.games}</td>
+              <td>${p.first_game}</td>
+              <td>${p.last_game}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+document.getElementById("refreshCacheBtn").onclick = refreshCache;
+
+/* ── Init ──────────────────────────────────────────────────────── */
+fillStatOptions(document.getElementById("sport").value);
+fillDefaultSeasons(5);
+refreshCache();
+drawChart([], null);
+</script>
+</body>
+</html>
